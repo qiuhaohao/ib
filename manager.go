@@ -17,6 +17,12 @@ const (
 	UpdateFinish
 )
 
+const (
+	WarningMessageCodeMarketDataFarmConnectionIsOK = 2104
+	WarningMessageCodeSecDefDataFarmConnectionIsOK = 2158
+	WarningMessageCodeHistoryDataFarmIsConnected   = 2105
+)
+
 // Manager provides a high-level abstraction over selected IB API use cases.
 // It defines a contract for executing IB API operations with explicit
 // isolation, error handling and concurrency guarantees.
@@ -144,6 +150,10 @@ func (a *AbstractManager) startMainLoop(preLoop func() error, receive func(r Rep
 // consume handles sending one Reply to the receive function. Returning true
 // indicates the main loop should terminate (ie the AbstractManager close).
 func (a *AbstractManager) consume(r Reply, receive func(r Reply) (UpdateStatus, error)) (exit bool) {
+	if isNotificationErrorMessage(r) {
+		return false
+	}
+
 	updStatus := make(chan UpdateStatus)
 
 	go func() { // new goroutine to guarantee unlock
@@ -170,6 +180,21 @@ func (a *AbstractManager) consume(r Reply, receive func(r Reply) (UpdateStatus, 
 		a.update <- true
 		return true
 	}
+	return false
+}
+
+func isNotificationErrorMessage(r Reply) bool {
+	errMsg, ok := r.(*ErrorMessage)
+	if !ok {
+		return false
+	}
+
+	if errMsg.Code == WarningMessageCodeHistoryDataFarmIsConnected ||
+		errMsg.Code == WarningMessageCodeSecDefDataFarmConnectionIsOK ||
+		errMsg.Code == WarningMessageCodeHistoryDataFarmIsConnected {
+		return true
+	}
+
 	return false
 }
 
