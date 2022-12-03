@@ -191,12 +191,37 @@ func (e *Engine) startReceiver() {
 			}
 		}
 
+		if isNotificationErrorMessage(r) {
+			continue
+		}
+
 		select {
 		case <-e.terminated:
 			return
 		case e.rxReply <- r:
 		}
 	}
+}
+
+const (
+	WarningMessageCodeMarketDataFarmConnectionIsOK = 2104
+	WarningMessageCodeSecDefDataFarmConnectionIsOK = 2158
+	WarningMessageCodeHistoryDataFarmIsConnected   = 2105
+)
+
+func isNotificationErrorMessage(r Reply) bool {
+	errMsg, ok := r.(*ErrorMessage)
+	if !ok {
+		return false
+	}
+
+	if errMsg.Code == WarningMessageCodeMarketDataFarmConnectionIsOK ||
+		errMsg.Code == WarningMessageCodeSecDefDataFarmConnectionIsOK ||
+		errMsg.Code == WarningMessageCodeHistoryDataFarmIsConnected {
+		return true
+	}
+
+	return false
 }
 
 func (e *Engine) startTransmitter() {
